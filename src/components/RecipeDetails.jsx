@@ -2,9 +2,24 @@ import { useState, useRef, useEffect } from "react";
 import { X, Clock, Check, Volume2, Square, Sparkles, RefreshCw } from "lucide-react";
 import { textToSpeech } from "../api/elevenlabs";
 import { generateRankedRecipe } from "../utils/aiRecipe";
+import { formatQuantity } from "../data/units";
 
-export default function RecipeDetails({ recipe, onClose, onMarkUsed, onRegenerate }) {
-  const [checked, setChecked] = useState(() => new Set(recipe.have.map((h) => h.pantryName)));
+// For each pantry item this recipe touches, default the "how many did you
+// use" amount to the item's full quantity — matches the old all-or-nothing
+// behavior unless the user dials it down. Untracked items (no quantity) map
+// to null, meaning "use the whole entry" since there's nothing to partially
+// deduct from.
+function initialUsage(have, pantry) {
+  const map = new Map();
+  have.forEach((h) => {
+    const pantryItem = pantry.find((p) => p.name === h.pantryName);
+    map.set(h.pantryName, pantryItem?.quantity ?? null);
+  });
+  return map;
+}
+
+export default function RecipeDetails({ recipe, onClose, onMarkUsed, onRegenerate, pantry }) {
+  const [usedAmounts, setUsedAmounts] = useState(() => initialUsage(recipe.have, pantry));
   const [speaking, setSpeaking] = useState(false);
   const [speechError, setSpeechError] = useState(null);
   const [regenerating, setRegenerating] = useState(false);
@@ -66,19 +81,28 @@ export default function RecipeDetails({ recipe, onClose, onMarkUsed, onRegenerat
   }
 
   function toggle(pantryName) {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(pantryName)) next.delete(pantryName);
-      else next.add(pantryName);
+    setUsedAmounts((prev) => {
+      const next = new Map(prev);
+      if (next.has(pantryName)) {
+        next.delete(pantryName);
+      } else {
+        const pantryItem = pantry.find((p) => p.name === pantryName);
+        next.set(pantryName, pantryItem?.quantity ?? null);
+      }
       return next;
     });
   }
 
+  function setAmount(pantryName, amount, max) {
+    const clamped = Math.min(max, Math.max(1, Number(amount) || 1));
+    setUsedAmounts((prev) => new Map(prev).set(pantryName, clamped));
+  }
+
   function handleMarkUsed() {
-    const usedNames = recipe.have
-      .filter((h) => checked.has(h.pantryName))
-      .map((h) => h.pantryName);
-    onMarkUsed(usedNames, recipe.title);
+    const usages = recipe.have
+      .filter((h) => usedAmounts.has(h.pantryName))
+      .map((h) => ({ pantryName: h.pantryName, amount: usedAmounts.get(h.pantryName) }));
+    onMarkUsed(usages, recipe.title);
   }
 
   return (
@@ -145,17 +169,37 @@ export default function RecipeDetails({ recipe, onClose, onMarkUsed, onRegenerat
 
         <div className="mark-used-section">
           <h3>Mark ingredients used</h3>
-          {recipe.have.map((h) => (
-            <label key={h.pantryName}>
-              <input
-                type="checkbox"
-                checked={checked.has(h.pantryName)}
-                onChange={() => toggle(h.pantryName)}
-              />
-              {h.pantryName}
-            </label>
-          ))}
-          <button className="mark-used-btn" onClick={handleMarkUsed} disabled={checked.size === 0}>
+          {recipe.have.map((h) => {
+            const pantryItem = pantry.find((p) => p.name === h.pantryName);
+            const isChecked = usedAmounts.has(h.pantryName);
+            const hasQty = pantryItem?.quantity != null;
+            return (
+              <div key={h.pantryName} className="mark-used-row">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggle(h.pantryName)}
+                  />
+                  {h.pantryName}
+                </label>
+                {isChecked && hasQty && (
+                  <div className="mark-used-amount">
+                    <span>used</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max={pantryItem.quantity}
+                      value={usedAmounts.get(h.pantryName)}
+                      onChange={(e) => setAmount(h.pantryName, e.target.value, pantryItem.quantity)}
+                    />
+                    <span>of {formatQuantity(pantryItem.quantity, pantryItem.unit)}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <button className="mark-used-btn" onClick={handleMarkUsed} disabled={usedAmounts.size === 0}>
             <Check size={15} /> Mark Used
           </button>
         </div>

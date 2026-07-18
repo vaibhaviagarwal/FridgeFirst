@@ -18,16 +18,19 @@ function loadJSON(key, fallback) {
 
 let idCounter = 1;
 
-function buildItem(name, quantity, expiryDays) {
+function buildItem(name, quantity, unit, expiryDays) {
   const shelfLife = getShelfLifeDefault(name);
   const days = expiryDays !== null && expiryDays !== undefined ? expiryDays : shelfLife.days;
   const expiryDate = new Date();
   expiryDate.setDate(expiryDate.getDate() + days);
 
+  const numericQuantity = quantity !== null && quantity !== undefined && quantity !== "" ? Number(quantity) : null;
+
   return {
     id: idCounter++,
     name,
-    quantity: quantity || null,
+    quantity: numericQuantity && numericQuantity > 0 ? numericQuantity : null,
+    unit: numericQuantity ? unit || "count" : null,
     category: shelfLife.category,
     pantryStaple: shelfLife.pantryStaple,
     expiresAt: expiryDate.toISOString(),
@@ -78,10 +81,10 @@ export function usePantry() {
   // logic) is responsible for deduping there instead of collapsing this
   // list.
   const addItem = useCallback(
-    ({ name, quantity = null, expiryDays = null }) => {
+    ({ name, quantity = null, unit = null, expiryDays = null }) => {
       const trimmed = (name || "").trim();
       if (!trimmed) return null;
-      const item = buildItem(trimmed.toLowerCase(), quantity, expiryDays);
+      const item = buildItem(trimmed.toLowerCase(), quantity, unit, expiryDays);
       setPantry((prev) => [...prev, item]);
       rememberRecent(item.name);
       return item;
@@ -104,8 +107,18 @@ export function usePantry() {
     [addItem]
   );
 
+
   const removeItem = useCallback((id) => {
     setPantry((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  // Full local reset — this app has no accounts/backend, so "clear all
+  // data" from the account panel is the closest equivalent to a real
+  // account action (sign out / delete account) available here.
+  const clearAllData = useCallback(() => {
+    setPantry([]);
+    setRescueLog([]);
+    setRecentNames([]);
   }, []);
 
   // Restores an exact item object (used for "Undo" after a delete).
@@ -137,6 +150,59 @@ export function usePantry() {
       markUsed([id], null);
     },
     [markUsed]
+  );
+
+  // Recipe-completion version of markUsed: usages is [{ id, amount }].
+  // Items without quantity tracking (amount undefined/null) are removed
+  // entirely, same as before. Quantity-tracked items are decremented by
+  // `amount` and only removed once nothing's left — so checking off "eggs"
+  // on a recipe that used 2 of your 5 doesn't wipe out the other 3.
+  const markUsedWithQuantities = useCallback(
+    (usages, recipeTitle) => {
+      const removeIds = [];
+      setPantry((prev) =>
+        prev.reduce((acc, item) => {
+          const usage = usages.find((u) => u.id === item.id);
+          if (!usage) {
+            acc.push(item);
+            return acc;
+          }
+          const hasQty = item.quantity != null;
+          const remaining = hasQty ? item.quantity - (usage.amount ?? item.quantity) : 0;
+          if (!hasQty || remaining <= 0) {
+            removeIds.push(item.id);
+            return acc;
+          }
+          acc.push({ ...item, quantity: remaining });
+          return acc;
+        }, [])
+      );
+      setRescueLog((prev) => [
+        ...prev,
+        { date: new Date().toISOString(), count: usages.length, recipeTitle: recipeTitle || null },
+      ]);
+      return removeIds;
+    },
+    []
+  );
+
+  // Lets a quantity-tracked item be adjusted up (bought more) or down (used
+  // some) without removing/re-adding it. Hitting zero counts as "used up" —
+  // routed through markUsed so it still logs to the rescue streak, same as
+  // the full "Mark used" action.
+  const adjustQuantity = useCallback(
+    (id, delta) => {
+      const item = pantry.find((i) => i.id === id);
+      if (!item || !item.quantity) return;
+
+      const next = item.quantity + delta;
+      if (next <= 0) {
+        markUsed([id], null);
+        return;
+      }
+      setPantry((prev) => prev.map((i) => (i.id === id ? { ...i, quantity: next } : i)));
+    },
+    [pantry, markUsed]
   );
 
   const daysLeft = useCallback((item) => {
@@ -195,9 +261,12 @@ export function usePantry() {
     addFromQuickAdd,
     removeItem,
     restoreItem,
+    clearAllData,
     extendExpiry,
     markUsed,
     markUsedSingle,
+    markUsedWithQuantities,
+    adjustQuantity,
     daysLeft,
     rescueLog,
     totalRescued,

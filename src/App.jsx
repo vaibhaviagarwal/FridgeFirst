@@ -8,6 +8,8 @@ import PantryList from "./components/PantryList";
 import RecipeFinder from "./components/RecipeFinder";
 import RecipeDetails from "./components/RecipeDetails";
 import RescueCounter from "./components/RescueCounter";
+import NotificationsPanel from "./components/NotificationsPanel";
+import AccountPanel from "./components/AccountPanel";
 import Toast from "./components/Toast";
 import "./App.css";
 
@@ -20,9 +22,11 @@ export default function App() {
     addItem,
     removeItem,
     restoreItem,
+    clearAllData,
     extendExpiry,
-    markUsed,
     markUsedSingle,
+    markUsedWithQuantities,
+    adjustQuantity,
     daysLeft,
     rescueLog,
     totalRescued,
@@ -32,6 +36,8 @@ export default function App() {
 
   const [view, setView] = useState("dashboard"); // dashboard | pantry | recipes | history
   const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const recipeFinderKey = useRef(0);
   const { toast, showToast, dismissToast } = useToast();
 
@@ -91,19 +97,41 @@ export default function App() {
     showToast("Extended by 3 days");
   }
 
+  function handleAdjustQuantity(id, delta) {
+    const item = pantry.find((i) => i.id === id);
+    adjustQuantity(id, delta);
+    if (item && item.quantity + delta <= 0) {
+      showToast(`✓ Used up ${item.name}`);
+    }
+  }
+
+  function handleClearData() {
+    clearAllData();
+    setView("dashboard");
+    showToast("All local data cleared");
+  }
+
   function handleMakeRecipesFor() {
     handleFindRecipes();
   }
 
-  // RecipeDetails reports back a list of pantry-item *names* that were used;
-  // resolve those to ids here since usePantry.markUsed operates on ids.
-  function handleMarkUsed(pantryNames, recipeTitle) {
-    const ids = pantry
-      .filter((item) => pantryNames.includes(item.name))
-      .map((item) => item.id);
-    markUsed(ids, recipeTitle);
+  // RecipeDetails reports back [{ pantryName, amount }] — amount is how
+  // much of that ingredient the recipe actually used (null means "all of
+  // it" for items without quantity tracking). Resolve names to ids here
+  // since usePantry operates on ids; if a name matches more than one
+  // pantry entry (e.g. two separate egg cartons), the first match is used,
+  // same tie-break as the recipe matching logic that built `have` in the
+  // first place.
+  function handleMarkUsed(usages, recipeTitle) {
+    const resolved = usages
+      .map(({ pantryName, amount }) => {
+        const item = pantry.find((i) => i.name === pantryName);
+        return item ? { id: item.id, amount } : null;
+      })
+      .filter(Boolean);
+    markUsedWithQuantities(resolved, recipeTitle);
     setSelectedRecipe(null);
-    showToast(`✓ Marked ${ids.length} ingredient${ids.length === 1 ? "" : "s"} as used`);
+    showToast(`✓ Marked ${resolved.length} ingredient${resolved.length === 1 ? "" : "s"} as used`);
   }
 
   return (
@@ -111,12 +139,47 @@ export default function App() {
       <div className="status-bar">
         <span className="status-greeting">Welcome back</span>
         <div className="status-bar-right">
-          <button className="icon-btn" aria-label="Notifications" title="Notifications">
-            <Bell size={15} />
-            {eatToday.length > 0 && <span className="badge">{eatToday.length}</span>}
-          </button>
-          <div className="avatar" title="Account">
-            <User size={14} />
+          <div className="status-icon-wrap">
+            <button
+              className="icon-btn"
+              aria-label="Notifications"
+              title="Notifications"
+              onClick={() => {
+                setAccountOpen(false);
+                setNotifOpen((v) => !v);
+              }}
+            >
+              <Bell size={15} />
+              {eatToday.length > 0 && <span className="badge">{eatToday.length}</span>}
+            </button>
+            {notifOpen && (
+              <NotificationsPanel
+                eatToday={eatToday}
+                eatSoon={eatSoon}
+                onViewPantry={() => setView("pantry")}
+                onClose={() => setNotifOpen(false)}
+              />
+            )}
+          </div>
+          <div className="status-icon-wrap">
+            <button
+              className="avatar"
+              title="Account"
+              onClick={() => {
+                setNotifOpen(false);
+                setAccountOpen((v) => !v);
+              }}
+            >
+              <User size={14} />
+            </button>
+            {accountOpen && (
+              <AccountPanel
+                streak={streak}
+                totalRescued={totalRescued}
+                onClearData={handleClearData}
+                onClose={() => setAccountOpen(false)}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -168,6 +231,7 @@ export default function App() {
             onMarkUsed={handleMarkUsedSingle}
             onExtend={handleExtend}
             onMakeRecipes={handleMakeRecipesFor}
+            onAdjustQuantity={handleAdjustQuantity}
           />
         )}
 
@@ -189,6 +253,7 @@ export default function App() {
         <RecipeDetails
           key={selectedRecipe.id}
           recipe={selectedRecipe}
+          pantry={pantry}
           onClose={() => setSelectedRecipe(null)}
           onMarkUsed={handleMarkUsed}
           onRegenerate={setSelectedRecipe}

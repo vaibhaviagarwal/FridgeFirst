@@ -1,8 +1,19 @@
+<p align="center">
+  <img src="public/logo-full.svg" alt="FridgeFirst logo" width="140" />
+</p>
+
 # FridgeFirst
 
 A desktop pantry tracker and recipe finder that helps you use up what you already have before it goes to waste. Add ingredients as you buy them, get an urgency-first view of what needs to be eaten soon, and find real recipes that use it — by ingredient, mood, meal course, diet, or voice.
 
 Built with React, Vite, and Electron.
+
+## Screenshots
+
+<!-- Add screenshots here, e.g.: -->
+<!-- ![Rescue dashboard](docs/screenshot-dashboard.png) -->
+<!-- ![Recipe finder](docs/screenshot-recipes.png) -->
+<!-- ![Pantry list](docs/screenshot-pantry.png) -->
 
 ## Features
 

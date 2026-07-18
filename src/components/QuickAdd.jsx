@@ -3,6 +3,7 @@ import { Mic, Plus } from "lucide-react";
 import { COMMON_INGREDIENTS } from "../data/commonIngredients";
 import { INGREDIENT_SUGGESTIONS } from "../data/ingredientSuggestions";
 import { getShelfLifeDefault } from "../data/shelfLife";
+import { UNITS } from "../data/units";
 import CategoryIcon from "./CategoryIcon";
 
 const EXPIRY_OPTIONS = [
@@ -25,6 +26,8 @@ const SpeechRecognition =
 
 export default function QuickAdd({ onAddItem, recentNames, pantryEmpty }) {
   const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [unit, setUnit] = useState("count");
   const [expiryChoice, setExpiryChoice] = useState("");
   const [customDate, setCustomDate] = useState("");
   const [listening, setListening] = useState(false);
@@ -56,9 +59,11 @@ export default function QuickAdd({ onAddItem, recentNames, pantryEmpty }) {
     e.preventDefault();
     setTouched(true);
     if (!name.trim() || INVALID_CHARS.test(name)) return;
-    const item = onAddItem({ name, expiryDays: expiryDaysFromChoice() });
+    const item = onAddItem({ name, quantity: quantity || null, unit, expiryDays: expiryDaysFromChoice() });
     if (item) {
       setName("");
+      setQuantity("");
+      setUnit("count");
       setExpiryChoice("");
       setCustomDate("");
       setTouched(false);
@@ -154,6 +159,28 @@ export default function QuickAdd({ onAddItem, recentNames, pantryEmpty }) {
               <option key={s} value={s} />
             ))}
           </datalist>
+        </div>
+
+        <div className="quick-add-field">
+          <label>Quantity (optional)</label>
+          <div className="quantity-input-row">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              placeholder="e.g. 5"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="quantity-number-input"
+            />
+            <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+              {UNITS.map((u) => (
+                <option key={u.value} value={u.value}>
+                  {u.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="quick-add-field">

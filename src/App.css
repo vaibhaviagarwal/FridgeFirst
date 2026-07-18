@@ -143,6 +143,130 @@ button {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
+  padding: 0;
+  cursor: pointer;
+}
+
+.status-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dropdown-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 220px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 14px;
+  z-index: 20;
+  text-align: left;
+}
+
+.dropdown-section {
+  margin-bottom: 10px;
+}
+
+.dropdown-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.dropdown-section-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gray-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.dropdown-section-title.urgent {
+  color: var(--red);
+}
+
+.dropdown-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dropdown-panel li {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--gray-dark);
+  padding: 3px 0;
+  text-transform: capitalize;
+}
+
+.dropdown-empty {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--gray-medium);
+  margin: 0 0 4px;
+}
+
+.dropdown-note {
+  font-family: var(--font-ui);
+  font-size: 0.76rem;
+  color: var(--gray-medium);
+  margin: 10px 0;
+  line-height: 1.5;
+}
+
+.dropdown-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.83rem;
+  padding: 8px 10px;
+  border-radius: calc(var(--radius) - 4px);
+  border: 1px solid var(--green);
+  background: var(--green-light);
+  color: var(--green);
+  cursor: pointer;
+}
+
+.dropdown-action.danger {
+  border-color: var(--red);
+  background: var(--white);
+  color: var(--red);
+}
+
+.dropdown-action.danger.confirming {
+  background: var(--red);
+  color: var(--white);
+}
+
+.account-stat-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+}
+
+.account-stat-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--gray-dark);
+}
+
+.account-stat-label {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--gray-medium);
 }
 
 /* --- Header / logo --- */
@@ -335,6 +459,51 @@ button {
 
 .custom-date-input {
   margin-top: 6px;
+}
+
+.quantity-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.quantity-number-input {
+  width: 80px;
+  flex: none !important;
+}
+
+.quantity-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  width: fit-content;
+}
+
+.quantity-stepper button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 6px);
+  background: var(--white);
+  color: var(--gray-dark);
+  cursor: pointer;
+  padding: 0;
+}
+
+.quantity-stepper button:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.quantity-stepper-value {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--gray-dark);
+  min-width: 44px;
+  text-align: center;
 }
 
 .mic-btn {
@@ -1370,11 +1539,42 @@ button {
   margin: 0 0 8px;
 }
 
+.mark-used-row {
+  margin: 8px 0;
+}
+
 .mark-used-section label {
   display: block;
-  margin: 8px 0;
   font-family: var(--font-ui);
   font-size: 0.88rem;
+}
+
+.mark-used-amount {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0 24px;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--gray-medium);
+}
+
+.mark-used-amount input {
+  width: 56px;
+  padding: 4px 8px;
+  background: var(--green-light);
+  border: 1px solid var(--green);
+  border-radius: calc(var(--radius) - 6px);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--gray-dark);
+}
+
+.mark-used-amount input:focus {
+  outline: none;
+  background: var(--white);
+  border-color: var(--green);
 }
 
 .mark-used-btn {

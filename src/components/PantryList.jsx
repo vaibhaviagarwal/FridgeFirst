@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { Leaf, Clock, ChefHat, Check, CalendarPlus, Trash2 } from "lucide-react";
+import { Leaf, Clock, ChefHat, Check, CalendarPlus, Trash2, Minus, Plus } from "lucide-react";
 import CategoryIcon from "./CategoryIcon";
+import { formatQuantity } from "../data/units";
 
 const SORT_OPTIONS = [
   { value: "expiry", label: "Sort by expiry" },
@@ -19,10 +20,11 @@ function formatAddedDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function IngredientCard({ item, daysLeft, onRemove, onMarkUsed, onExtend, onMakeRecipes }) {
+function IngredientCard({ item, daysLeft, onRemove, onMarkUsed, onExtend, onMakeRecipes, onAdjustQuantity }) {
   const left = daysLeft(item);
   const isUrgent = !item.pantryStaple && left <= 3;
   const pct = item.pantryStaple ? 100 : freshnessPercent(left);
+  const hasQuantity = item.quantity != null;
 
   return (
     <div className={`ingredient-card${isUrgent ? " urgent" : ""}`}>
@@ -33,13 +35,34 @@ function IngredientCard({ item, daysLeft, onRemove, onMarkUsed, onExtend, onMake
       <div className="ingredient-card-main">
         <div className="ingredient-card-name">
           {item.name}
-          {item.quantity ? ` (${item.quantity})` : ""}
+          {hasQuantity ? ` (${formatQuantity(item.quantity, item.unit)})` : ""}
         </div>
         <div className="ingredient-card-meta">
           <span className="meta-category">{item.category}</span>
           <span className="meta-sep">·</span>
           <span className="meta-added">Added {formatAddedDate(item.addedAt)}</span>
         </div>
+        {hasQuantity && (
+          <div className="quantity-stepper">
+            <button
+              type="button"
+              onClick={() => onAdjustQuantity(item.id, -1)}
+              aria-label={`Use one ${item.name}`}
+              title="Used one"
+            >
+              <Minus size={13} />
+            </button>
+            <span className="quantity-stepper-value">{formatQuantity(item.quantity, item.unit)}</span>
+            <button
+              type="button"
+              onClick={() => onAdjustQuantity(item.id, 1)}
+              aria-label={`Add one ${item.name}`}
+              title="Bought more"
+            >
+              <Plus size={13} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="ingredient-card-freshness">
@@ -80,7 +103,7 @@ function IngredientCard({ item, daysLeft, onRemove, onMarkUsed, onExtend, onMake
   );
 }
 
-export default function PantryList({ pantry, daysLeft, onRemove, onMarkUsed, onExtend, onMakeRecipes }) {
+export default function PantryList({ pantry, daysLeft, onRemove, onMarkUsed, onExtend, onMakeRecipes, onAdjustQuantity }) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("expiry");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -183,6 +206,7 @@ export default function PantryList({ pantry, daysLeft, onRemove, onMarkUsed, onE
                     onMarkUsed={onMarkUsed}
                     onExtend={onExtend}
                     onMakeRecipes={onMakeRecipes}
+                    onAdjustQuantity={onAdjustQuantity}
                   />
                 ))}
               </div>
@@ -202,6 +226,7 @@ export default function PantryList({ pantry, daysLeft, onRemove, onMarkUsed, onE
                     onMarkUsed={onMarkUsed}
                     onExtend={onExtend}
                     onMakeRecipes={onMakeRecipes}
+                    onAdjustQuantity={onAdjustQuantity}
                   />
                 ))}
               </div>
