@@ -10,10 +10,24 @@ Built with React, Vite, and Electron.
 
 ## Screenshots
 
-<!-- Add screenshots here, e.g.: -->
-<!-- ![Rescue dashboard](docs/screenshot-dashboard.png) -->
-<!-- ![Recipe finder](docs/screenshot-recipes.png) -->
-<!-- ![Pantry list](docs/screenshot-pantry.png) -->
+**Pantry** — urgency-grouped ingredient cards with quantity steppers you can adjust as you use things up.
+
+![Pantry list](docs/screenshots/pantry.png)
+
+**Recipe Finder** — search by ingredients on hand, with filters for meal course, mood, diet, cuisine, and cook time. Falls back to TheMealDB automatically if Spoonacular's limit is hit.
+
+![Recipe finder](docs/screenshots/recipe-finder.png)
+
+**AI recipe fallback** — when a search comes back sparse, generate a one-off recipe from your pantry, clearly labeled and regenerable if you don't like the result. "Mark ingredients used" also asks how much of a tracked quantity you actually used, instead of assuming you used it all.
+
+![Recipe details with AI fallback](docs/screenshots/recipe-details-ai.png)
+
+**Notifications and account panel** — the bell surfaces what's expiring soon; the account panel shows your rescue stats and local-data controls (no login needed — everything's stored on-device).
+
+<p>
+  <img src="docs/screenshots/notifications.png" alt="Notifications panel" height="220" />
+  <img src="docs/screenshots/account-panel.png" alt="Account panel" height="220" />
+</p>
 
 ## Features
 
