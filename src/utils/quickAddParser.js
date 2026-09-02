@@ -2,6 +2,7 @@
 //   "spinach 3 days"
 //   "spinach"
 //   "2 eggs today"
+//   "1.5 avocados tomorrow"
 //   "milk expires tomorrow"
 // into { name, quantity, expiryDays } — expiryDays is null if not specified,
 // in which case getShelfLifeDefault() fills it in.
@@ -43,7 +44,7 @@ export function parseQuickAdd(input) {
 
   // strip a leading quantity number (e.g. "2 eggs" -> "eggs", remember qty)
   let quantity = null;
-  const qtyMatch = text.match(/^(\d+)\s+(.*)/);
+  const qtyMatch = text.match(/^(\d+(?:\.\d+)?)\s+(.*)/);
   if (qtyMatch) {
     quantity = qtyMatch[1];
     text = qtyMatch[2];

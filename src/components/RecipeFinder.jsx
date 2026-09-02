@@ -45,6 +45,15 @@ export default function RecipeFinder({ pantry, expiringSoon, onSelectRecipe }) {
   const [sortOrder, setSortOrder] = useState("default");
   const [visibleCount, setVisibleCount] = useState(9);
 
+  useEffect(() => {
+    const pantryNames = Array.from(new Set(pantry.map((item) => item.name)));
+    setSelectedNames((previous) => {
+      const stillAvailable = previous.filter((name) => pantryNames.includes(name));
+      const newlyAdded = pantryNames.filter((name) => !previous.includes(name));
+      return [...stillAvailable, ...newlyAdded];
+    });
+  }, [pantry]);
+
   const sortedRecipes = useMemo(() => {
     if (sortOrder === "default") return recipes;
     const copy = [...recipes];

@@ -13,6 +13,7 @@ dist-check*
 dist-ssr
 *.local
 .env
+.npm-cache
 release
 
 # Editor directories and files

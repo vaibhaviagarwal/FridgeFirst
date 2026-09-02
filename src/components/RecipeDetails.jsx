@@ -57,6 +57,7 @@ export default function RecipeDetails({ recipe, onClose, onMarkUsed, onRegenerat
       audio.onerror = () => {
         setSpeaking(false);
         setSpeechError("Playback failed.");
+        URL.revokeObjectURL(url);
       };
       await audio.play();
       setSpeaking(true);

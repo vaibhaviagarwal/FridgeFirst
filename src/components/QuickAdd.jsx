@@ -4,6 +4,7 @@ import { COMMON_INGREDIENTS } from "../data/commonIngredients";
 import { INGREDIENT_SUGGESTIONS } from "../data/ingredientSuggestions";
 import { getShelfLifeDefault } from "../data/shelfLife";
 import { UNITS } from "../data/units";
+import { parseQuickAdd } from "../utils/quickAddParser";
 import CategoryIcon from "./CategoryIcon";
 
 const EXPIRY_OPTIONS = [
@@ -17,8 +18,9 @@ const EXPIRY_OPTIONS = [
 ];
 
 // Only letters, spaces, hyphens, and apostrophes are valid ingredient names
-// (e.g. "greek yogurt", "day-old bread"). Anything else — digits, symbols —
-// gets flagged live rather than silently accepted or silently stripped.
+// once a quick-add phrase has been normalized (e.g. "2 eggs tomorrow" ->
+// "eggs"). Symbols and malformed names still get flagged live rather than
+// silently accepted or silently stripped.
 const INVALID_CHARS = /[^a-zA-Z\s'-]/;
 
 const SpeechRecognition =
@@ -40,7 +42,18 @@ export default function QuickAdd({ onAddItem, recentNames, pantryEmpty }) {
     };
   }, []);
 
-  const isInvalid = touched && name.length > 0 && INVALID_CHARS.test(name);
+  const parsedQuickAdd = quantity === "" && expiryChoice === "" && !customDate ? parseQuickAdd(name) : null;
+  const nameToValidate = parsedQuickAdd?.name ?? name;
+  const isInvalid = touched && name.length > 0 && INVALID_CHARS.test(nameToValidate);
+
+  function resetForm() {
+    setName("");
+    setQuantity("");
+    setUnit("count");
+    setExpiryChoice("");
+    setCustomDate("");
+    setTouched(false);
+  }
 
   function expiryDaysFromChoice() {
     if (expiryChoice === "") return null; // smart default from shelf-life table
@@ -58,16 +71,21 @@ export default function QuickAdd({ onAddItem, recentNames, pantryEmpty }) {
   function handleStructuredSubmit(e) {
     e.preventDefault();
     setTouched(true);
+
+    if (parsedQuickAdd && !INVALID_CHARS.test(parsedQuickAdd.name)) {
+      const item = onAddItem({
+        name: parsedQuickAdd.name,
+        quantity: parsedQuickAdd.quantity,
+        unit: parsedQuickAdd.quantity ? "count" : null,
+        expiryDays: parsedQuickAdd.expiryDays,
+      });
+      if (item) resetForm();
+      return;
+    }
+
     if (!name.trim() || INVALID_CHARS.test(name)) return;
     const item = onAddItem({ name, quantity: quantity || null, unit, expiryDays: expiryDaysFromChoice() });
-    if (item) {
-      setName("");
-      setQuantity("");
-      setUnit("count");
-      setExpiryChoice("");
-      setCustomDate("");
-      setTouched(false);
-    }
+    if (item) resetForm();
   }
 
   function handleChipClick(ingredientName) {
@@ -134,7 +152,7 @@ export default function QuickAdd({ onAddItem, recentNames, pantryEmpty }) {
             <input
               type="text"
               list="ingredient-suggestions"
-              placeholder="e.g. Chicken Breast"
+              placeholder="e.g. Chicken Breast or 2 eggs tomorrow"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onBlur={() => setTouched(true)}
@@ -153,7 +171,7 @@ export default function QuickAdd({ onAddItem, recentNames, pantryEmpty }) {
               </button>
             )}
           </div>
-          {isInvalid && <div className="field-error">Letters only, please.</div>}
+          {isInvalid && <div className="field-error">Letters only, or use a simple phrase like "2 eggs tomorrow".</div>}
           <datalist id="ingredient-suggestions">
             {INGREDIENT_SUGGESTIONS.map((s) => (
               <option key={s} value={s} />

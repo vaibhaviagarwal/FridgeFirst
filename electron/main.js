@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, shell } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -14,7 +14,14 @@ function createWindow() {
     icon: path.join(__dirname, "../build/icon.png"),
     webPreferences: {
       contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
     },
+  });
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
   });
 
   if (isDev) {

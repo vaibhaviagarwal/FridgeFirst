@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { getShelfLifeDefault } from "../data/shelfLife";
-import { parseQuickAdd } from "../utils/quickAddParser";
+import {
+  adjustItemQuantity,
+  applyUsageWithQuantities,
+  calculateRescueStreak,
+  createPantryItem,
+  getDaysLeft,
+  groupPantryByUrgency,
+} from "../utils/pantry";
 
 const STORAGE_KEY = "fridgefirst.pantry";
 const RESCUE_LOG_KEY = "fridgefirst.rescueLog";
@@ -19,23 +25,7 @@ function loadJSON(key, fallback) {
 let idCounter = 1;
 
 function buildItem(name, quantity, unit, expiryDays) {
-  const shelfLife = getShelfLifeDefault(name);
-  const days = expiryDays !== null && expiryDays !== undefined ? expiryDays : shelfLife.days;
-  const expiryDate = new Date();
-  expiryDate.setDate(expiryDate.getDate() + days);
-
-  const numericQuantity = quantity !== null && quantity !== undefined && quantity !== "" ? Number(quantity) : null;
-
-  return {
-    id: idCounter++,
-    name,
-    quantity: numericQuantity && numericQuantity > 0 ? numericQuantity : null,
-    unit: numericQuantity ? unit || "count" : null,
-    category: shelfLife.category,
-    pantryStaple: shelfLife.pantryStaple,
-    expiresAt: expiryDate.toISOString(),
-    addedAt: new Date().toISOString(),
-  };
+  return createPantryItem({ id: idCounter++, name, quantity, unit, expiryDays });
 }
 
 export function usePantry() {
@@ -71,8 +61,8 @@ export function usePantry() {
     });
   }, []);
 
-  // Direct add — used by quick-start chips, the structured add form, and
-  // voice input. Bypasses the free-text parser entirely.
+  // Shared add path once any UI input has been normalized — used by the
+  // chip shortcuts, the structured form, quick-add parsing, and voice input.
   //
   // Multiple pantry entries with the same name are allowed on purpose —
   // e.g. two bags of rice bought on different days genuinely have
@@ -91,22 +81,6 @@ export function usePantry() {
     },
     [rememberRecent]
   );
-
-  // Free-text fallback for power users who'd rather type
-  // "spinach 3 days" than use the structured form.
-  const addFromQuickAdd = useCallback(
-    (input) => {
-      const parsed = parseQuickAdd(input);
-      if (!parsed) return null;
-      return addItem({
-        name: parsed.name,
-        quantity: parsed.quantity,
-        expiryDays: parsed.expiryDays,
-      });
-    },
-    [addItem]
-  );
-
 
   const removeItem = useCallback((id) => {
     setPantry((prev) => prev.filter((item) => item.id !== id));
@@ -159,97 +133,44 @@ export function usePantry() {
   // on a recipe that used 2 of your 5 doesn't wipe out the other 3.
   const markUsedWithQuantities = useCallback(
     (usages, recipeTitle) => {
-      const removeIds = [];
-      setPantry((prev) =>
-        prev.reduce((acc, item) => {
-          const usage = usages.find((u) => u.id === item.id);
-          if (!usage) {
-            acc.push(item);
-            return acc;
-          }
-          const hasQty = item.quantity != null;
-          const remaining = hasQty ? item.quantity - (usage.amount ?? item.quantity) : 0;
-          if (!hasQty || remaining <= 0) {
-            removeIds.push(item.id);
-            return acc;
-          }
-          acc.push({ ...item, quantity: remaining });
-          return acc;
-        }, [])
-      );
+      const { pantry: nextPantry } = applyUsageWithQuantities(pantry, usages);
+      setPantry(nextPantry);
       setRescueLog((prev) => [
         ...prev,
         { date: new Date().toISOString(), count: usages.length, recipeTitle: recipeTitle || null },
       ]);
-      return removeIds;
     },
-    []
+    [pantry]
   );
 
   // Lets a quantity-tracked item be adjusted up (bought more) or down (used
-  // some) without removing/re-adding it. Hitting zero counts as "used up" —
-  // routed through markUsed so it still logs to the rescue streak, same as
-  // the full "Mark used" action.
+  // some) without removing/re-adding it. Hitting zero counts as "used up"
+  // and still logs to the rescue history, matching the full "Mark used"
+  // action.
   const adjustQuantity = useCallback(
     (id, delta) => {
-      const item = pantry.find((i) => i.id === id);
-      if (!item || !item.quantity) return;
+      const { pantry: nextPantry, usedUpIds } = adjustItemQuantity(pantry, id, delta);
+      if (nextPantry === pantry) return;
 
-      const next = item.quantity + delta;
-      if (next <= 0) {
-        markUsed([id], null);
+      setPantry(nextPantry);
+      if (usedUpIds.length > 0) {
+        setRescueLog((prev) => [
+          ...prev,
+          { date: new Date().toISOString(), count: usedUpIds.length, recipeTitle: null },
+        ]);
         return;
       }
-      setPantry((prev) => prev.map((i) => (i.id === id ? { ...i, quantity: next } : i)));
     },
-    [pantry, markUsed]
+    [pantry]
   );
 
-  const daysLeft = useCallback((item) => {
-    const diffMs = new Date(item.expiresAt) - new Date();
-    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  }, []);
+  const daysLeft = useCallback((item) => getDaysLeft(item), []);
 
-  // Urgency-first grouping: every non-staple item lands in exactly one
-  // bucket, so the dashboard can lead with "what needs attention" instead
-  // of just a filtered slice of the pantry.
-  const withDays = pantry.map((item) => ({ ...item, daysLeft: daysLeft(item) }));
-  const eatToday = withDays
-    .filter((i) => !i.pantryStaple && i.daysLeft <= 1)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
-  const eatSoon = withDays
-    .filter((i) => !i.pantryStaple && i.daysLeft > 1 && i.daysLeft <= 3)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
-  const fresh = withDays.filter((i) => i.pantryStaple || i.daysLeft > 3);
-
-  // Kept for any code still expecting the old "expiring within 3 days" list.
-  const expiringSoon = [...eatToday, ...eatSoon];
+  const { eatToday, eatSoon, fresh, expiringSoon } = groupPantryByUrgency(pantry);
 
   const totalRescued = rescueLog.reduce((sum, entry) => sum + entry.count, 0);
 
-  // Simple, non-gamified streak: consecutive calendar days with at least
-  // one rescue, counting back from today (or yesterday, so it doesn't
-  // reset the instant midnight passes).
-  const streak = (() => {
-    if (rescueLog.length === 0) return 0;
-    const dateStrings = [...new Set(rescueLog.map((e) => new Date(e.date).toDateString()))]
-      .map((d) => new Date(d))
-      .sort((a, b) => b - a);
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const mostRecent = dateStrings[0];
-    const diffFromToday = Math.round((today - mostRecent) / (1000 * 60 * 60 * 24));
-    if (diffFromToday > 1) return 0;
-
-    let count = 1;
-    for (let i = 1; i < dateStrings.length; i++) {
-      const diff = Math.round((dateStrings[i - 1] - dateStrings[i]) / (1000 * 60 * 60 * 24));
-      if (diff === 1) count++;
-      else break;
-    }
-    return count;
-  })();
+  const streak = calculateRescueStreak(rescueLog);
 
   return {
     pantry,
@@ -258,7 +179,6 @@ export function usePantry() {
     fresh,
     expiringSoon,
     addItem,
-    addFromQuickAdd,
     removeItem,
     restoreItem,
     clearAllData,
